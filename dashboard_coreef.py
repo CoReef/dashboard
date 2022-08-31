@@ -31,6 +31,24 @@ class MyServer(BaseHTTPRequestHandler):
         self.write("<html><head><title>CoReef - Simple Dashboard</title></head>")
         # self.wfile.write(bytes("<p>Request: %s</p>" % self.path, "utf-8"))
         self.write("<body>")
+        self.write(f'<h2>Zeitstempel: {datetime.now().strftime("%d.%m.%Y %H:%M:%S Uhr")}</h2>')
+        
+        w = 'Wohnzimmer/reading'
+        t = 'Terasse/reading'
+        s = 'Schlafzimmer/reading'
+        if w in entries and t in entries and s in entries:
+            wt = entries[w]['Temperature']
+            tt = entries[t]['Temperature']
+            st = entries[s]['Temperature']
+            if tt < wt:
+                self.write(f'<p>Draussen ({tt} Celsius) ist es kaelter als im Wohnzimmer ({wt} Celsius). Unten kann gelueftet werden!</p>')
+            else:
+                self.write(f'<p>Draussen ({tt} Celsius) ist es waermer als im Wohnzimmer ({wt} Celsius). Tuer zu unten!</p>')
+            if tt < st:
+                self.write(f'<p>Draussen ({tt} Celsius) ist es kaelter als im Schlafzimmer ({st} Celsius). Oben kann gelueftet werden!</p>')
+            else:
+                self.write(f'<p>Draussen ({tt} Celsius) ist es waermer als im Schlafzimmer ({st} Celsius). Tuer zu oben!</p>')
+
         for entry in entries.keys():
             self.write(f'<h3>{entry}</h3>')
             readings = entries[entry]
