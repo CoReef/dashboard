@@ -4,7 +4,8 @@ import time
 from datetime import datetime
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-hostName = "localhost"
+# hostName = "127.0.0.1"
+hostName = "0.0.0.0"
 serverPort = 4343
 
 import crMQTT
@@ -44,8 +45,11 @@ class MyServer(BaseHTTPRequestHandler):
         self.wfile.write(bytes(s,"utf-8"))
 
 def main():
+    print("dashboard started")
     webServer = HTTPServer((hostName, serverPort), MyServer)
+    print("HTTPServer started")
     mqtt.subscribe('#',on_message)
+    print("Connected to MQTT server")
 
     try:
         webServer.serve_forever()
