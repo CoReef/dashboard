@@ -1,7 +1,9 @@
+from curses import noraw
 import json
 import time
 
 from datetime import datetime
+from collections import namedtuple
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 # hostName = "127.0.0.1"
@@ -14,12 +16,25 @@ mqtt_address = '10.42.1.102'
 mqtt_port = 1884
 mqtt = crMQTT.crMQTT(mqtt_address,mqtt_port)
 
+Entry = namedtuple('Entry','tag last_message timestamp')
+
 entries = {}
 
 def on_message(tag,message):
-    entries[tag] = message
+    entry = Entry(tag,message,datetime.now())
+    entries[tag] = entry
 
 epoch_entries = set(['time_utc','date_max_temp','date_min_temp'])
+
+def timespan_description(ts_early,ts_late):
+    tsi = int((ts_late - ts_early).total_seconds()/60)
+    if tsi == 0:
+        return "now"
+    elif tsi == 1:
+        return "1 minute ago"
+    elif tsi < 60:
+        return f'{tsi} minutes ago'
+    return f'{tsi // 60}h {tsi % 60} minutes ago'
 class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         global entries
@@ -31,15 +46,15 @@ class MyServer(BaseHTTPRequestHandler):
         self.write("<html><head><title>CoReef - Simple Dashboard</title></head>")
         # self.wfile.write(bytes("<p>Request: %s</p>" % self.path, "utf-8"))
         self.write("<body>")
-        self.write(f'<h2>Zeitstempel: {datetime.now().strftime("%d.%m.%Y %H:%M:%S Uhr")}</h2>')
+        self.write(f'<h2>Aktueller Zeitstempel: {datetime.now().strftime("%d.%m.%Y %H:%M:%S Uhr")}</h2>')
         
         w = 'Wohnzimmer/reading'
         t = 'Terasse/reading'
         s = 'Schlafzimmer/reading'
         if w in entries and t in entries and s in entries:
-            wt = entries[w]['Temperature']
-            tt = entries[t]['Temperature']
-            st = entries[s]['Temperature']
+            wt = entries[w].last_message['Temperature']
+            tt = entries[t].last_message['Temperature']
+            st = entries[s].last_message['Temperature']
             if tt < wt:
                 self.write(f'<p>Draussen ({tt} Celsius) ist es kaelter als im Wohnzimmer ({wt} Celsius). Unten kann gelueftet werden!</p>')
             else:
@@ -49,13 +64,20 @@ class MyServer(BaseHTTPRequestHandler):
             else:
                 self.write(f'<p>Draussen ({tt} Celsius) ist es waermer als im Schlafzimmer ({st} Celsius). Tuer zu oben!</p>')
 
+        now = datetime.now()
         for entry in entries.keys():
             self.write(f'<h3>{entry}</h3>')
-            readings = entries[entry]
+            e = entries[entry]
+            readings = e.last_message
             self.write('<ul>')
+            diff = timespan_description(e.timestamp,now)
+            self.write(f'<li>Last message received {e.timestamp.strftime("%d.%m.%Y %H:%M:%S Uhr")} ({diff})</li>')
             for r in readings.keys():
-                v = readings[r] if not r in epoch_entries else datetime.fromtimestamp(readings[r]).strftime("%d.%m.%Y %H:%M Uhr (%Ss)")
-                self.write(f'<li>{r} : {v}</li>')
+                if r in epoch_entries:
+                    diff = timespan_description(datetime.fromtimestamp(readings[r]),now)
+                    self.write(f'<li>{r} : {datetime.fromtimestamp(readings[r]).strftime("%d.%m.%Y %H:%M:%S Uhr")} ({diff})</li>')
+                else:
+                    self.write(f'<li>{r} : {readings[r]}</li>')
             self.write('</ul>')
         self.write("</body></html>")
 
